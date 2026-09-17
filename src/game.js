@@ -1,4 +1,4 @@
-import { candidates, isBoard, isConsistent, LEVELS, PEERS, search } from './engine.js';
+import { candidates, isBoard, isConsistent, LEVELS, PEERS, ratePuzzle, search } from './engine.js';
 
 export const SAVE_VERSION = 1;
 export const DEFAULT_SETTINGS = { theme: 'light', highlight: true, mistakes: true, cleanNotes: true, showTimer: true };
@@ -8,6 +8,16 @@ const validCell = (index) => Number.isInteger(index) && index >= 0 && index < 81
 const validDate = (date) => typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date) &&
   Number.isFinite(Date.parse(date)) && new Date(date).toISOString().slice(0, 10) === date;
 export const puzzleId = (game) => `${game.mode === 'daily' ? `daily:${game.date}:` : 'classic:'}${game.initial.join('')}`;
+
+export function moveSelection(index, key) {
+  const current = validCell(index) ? index : 0;
+  const row = Math.floor(current / 9), column = current % 9;
+  if (key === 'ArrowLeft') return row * 9 + Math.max(0, column - 1);
+  if (key === 'ArrowRight') return row * 9 + Math.min(8, column + 1);
+  if (key === 'ArrowUp') return Math.max(0, row - 1) * 9 + column;
+  if (key === 'ArrowDown') return Math.min(8, row + 1) * 9 + column;
+  return current;
+}
 
 export function createGame({ puzzle, solution, level }, mode = 'classic', date = null) {
   return { version: SAVE_VERSION, initial: [...puzzle], solution: [...solution], values: [...puzzle],
@@ -76,23 +86,23 @@ export function applyHint(game, hint, settings) {
 
 export function validateGame(data) {
   if (!data || data.version !== SAVE_VERSION || !isBoard(data.initial) || !isConsistent(data.initial) ||
-    data.initial.filter(Boolean).length < 17 || !LEVELS.includes(data.level) || !['classic', 'daily'].includes(data.mode)) return null;
+    !data.initial.includes(0) || data.initial.filter(Boolean).length < 17 || !LEVELS.includes(data.level) || !['classic', 'daily'].includes(data.mode)) return null;
   if (data.mode === 'daily' && !validDate(data.date)) return null;
   const validSnapshot = (s) => s && isBoard(s.values) && Array.isArray(s.notes) && s.notes.length === 81 &&
     Array.from(s.notes).every((n, i) => Number.isInteger(n) && n >= 0 && n <= 1022 && !(n & 1) && (!s.values[i] || !n)) &&
     data.initial.every((n, i) => !n || n === s.values[i]);
   if (!validSnapshot(data) || !Array.isArray(data.history) || !Array.isArray(data.future) ||
-    data.history.length > 200 || data.future.length > 200 || !Array.from(data.history).every(validSnapshot) || !Array.from(data.future).every(validSnapshot)) return null;
+    data.history.length + data.future.length > 200 || !Array.from(data.history).every(validSnapshot) || !Array.from(data.future).every(validSnapshot)) return null;
   if (!['elapsed', 'mistakes', 'hints'].every((k) => Number.isFinite(data[k]) && data[k] >= 0 && data[k] < 1e12) ||
     !['mistakes', 'hints'].every((k) => Number.isInteger(data[k]))) return null;
   const solved = search(data.initial, 2, null, VALIDATION_SEARCH_BUDGET);
   if (solved.count !== 1) return null;
   return { version: SAVE_VERSION, initial: [...data.initial], solution: solved.solution, values: [...data.values], notes: [...data.notes],
-    history: data.history.map(snapshot), future: data.future.map(snapshot), level: data.level, mode: data.mode, date: data.mode === 'daily' ? data.date : null,
+    history: data.history.map(snapshot), future: data.future.map(snapshot), level: ratePuzzle(data.initial), mode: data.mode, date: data.mode === 'daily' ? data.date : null,
     elapsed: data.elapsed, mistakes: data.mistakes, hints: data.hints,
     completed: data.values.every((n, i) => n === solved.solution[i]),
     selected: Number.isInteger(data.selected) && data.selected >= 0 && data.selected < 81 ? data.selected : data.initial.indexOf(0),
-    noteMode: Boolean(data.noteMode) };
+    noteMode: data.noteMode === true };
 }
 
 export function validateSettings(data) {
@@ -117,7 +127,8 @@ export function validateStats(data) {
 }
 
 export function recordWin(stats, game, today) {
-  if (!game.completed || stats.wins.some((w) => w.id === puzzleId(game))) return false;
+  if (!game?.completed || !isConsistent(game.solution) || game.solution.includes(0) || !isBoard(game.values) || !game.values.every((n, i) => n === game.solution[i]) ||
+    !validDate(today) || stats.wins.some((w) => w.id === puzzleId(game))) return false;
   stats.wins.push({ id: puzzleId(game), level: game.level, elapsed: game.elapsed, hints: game.hints, date: today });
   if (game.mode === 'daily' && game.date === today && !stats.dailyDates.includes(today)) stats.dailyDates.push(today);
   stats.dailyDates.sort();
@@ -142,6 +153,7 @@ export function parseShared(hash) {
   if (!code || !/^[0-9]{81}$/.test(code) || !code.includes('0') || [...code].filter((c) => c !== '0').length < 17) return null;
   const puzzle = [...code].map(Number), solved = search(puzzle, 2, null, VALIDATION_SEARCH_BUDGET);
   if (solved.count !== 1) return null;
-  const level = LEVELS.includes(params.get('level')) ? params.get('level') : 'medium';
+  // Difficulty is a property of the puzzle, not a label supplied by its sender.
+  const level = ratePuzzle(puzzle);
   return { puzzle, solution: solved.solution, level };
 }

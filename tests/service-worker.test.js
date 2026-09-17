@@ -8,14 +8,17 @@ const source = await readFile(new URL('sw.js', root), 'utf8');
 const manifest = JSON.parse(await readFile(new URL('manifest.webmanifest', root), 'utf8'));
 const expectedAssets = [
   './', './index.html', './styles.css', './src/app.js', './src/engine.js',
-  './src/game.js', './src/puzzles.js', './favicon.svg', './manifest.webmanifest',
+  './src/game.js', './src/puzzles.js', './src/storage.js', './src/clock.js',
+  './favicon.svg', './manifest.webmanifest',
   './icons/icon-192.png', './icons/icon-512.png',
 ];
 
 function worker(scope = 'https://pankajarm.github.io/sudoku/') {
   const listeners = new Map(), cachesByName = new Map();
   const state = { scope, fetched: [], precached: [], deleted: [], opened: [],
-    offline: false, storageDenied: false, downloadFailed: false, claimed: 0, skipped: 0 };
+    offline: false, storageDenied: false, writeDenied: false, downloadFailed: false,
+    failDownloadAt: null, networkStatus: 200, networkRedirect: false, networkURL: '',
+    claimed: 0, skipped: 0 };
   const deny = () => { if (state.storageDenied) throw new Error('Storage denied'); };
   vm.runInNewContext(source, {
     URL, Request, Response,
@@ -34,14 +37,23 @@ function worker(scope = 'https://pankajarm.github.io/sudoku/') {
         return {
           async addAll(requests) {
             if (state.downloadFailed) throw new Error('An asset could not be downloaded');
+            // Cache.addAll commits atomically after every response succeeds.
+            const pending = [];
             for (const request of requests) {
-              state.precached.push({ url: request.url, cache: request.cache });
-              entries.set(request.url, `cached:${request.url}`);
+              state.precached.push({ url: request.url, cache: request.cache, redirect: request.redirect });
+              if (request.url === state.failDownloadAt) throw new Error('An asset could not be downloaded');
+              pending.push([request.url, `cached:${request.url}`]);
             }
+            for (const [url, value] of pending) entries.set(url, value);
           },
           async match(url) {
             const value = entries.get(url);
             return value === undefined ? undefined : new Response(value);
+          },
+          async put(url, response) {
+            deny();
+            if (state.writeDenied) throw new Error('Storage quota exhausted');
+            entries.set(url, await response.text());
           },
         };
       },
@@ -51,7 +63,12 @@ function worker(scope = 'https://pankajarm.github.io/sudoku/') {
     async fetch(request) {
       state.fetched.push(request.url);
       if (state.offline) throw new Error('Network unavailable');
-      return new Response(`network:${request.url}`);
+      const response = new Response(`network:${request.url}`, { status: state.networkStatus });
+      Object.defineProperties(response, {
+        redirected: { value: state.networkRedirect },
+        url: { value: state.networkURL || request.url },
+      });
+      return response;
     },
   });
   return {
@@ -79,10 +96,11 @@ test('precache contains every local runtime asset at either a project or root sc
     await app.lifecycle('install');
     assert.deepEqual(app.state.precached.map(({ url }) => url).sort(),
       expectedAssets.map((path) => new URL(path, scope).href).sort());
-    for (const { url, cache } of app.state.precached) {
+    for (const { url, cache, redirect } of app.state.precached) {
       assert.equal(new URL(url).origin, new URL(scope).origin);
       assert.ok(url.startsWith(scope), 'an asset must stay within this app scope');
       assert.equal(cache, 'reload', 'a release must not use stale HTTP cache responses');
+      assert.equal(redirect, 'error', 'precache downloads must not follow redirects to other resources');
     }
     assert.equal(app.state.skipped, 0, 'an update must not replace a game in an open tab');
   }
@@ -155,12 +173,49 @@ test('worker leaves external origins, other projects, unknown paths and non-GET 
   assert.equal(app.state.fetched.length, 0);
 });
 
-test('evicted cache entries fall back to the network', async () => {
+test('evicted cache entries fall back to the network and recover for later offline visits', async () => {
   const app = worker();
   await app.lifecycle('install');
   app.cachesByName.get(app.state.opened[0]).clear();
   const response = await app.request('./src/app.js', { mode: 'cors' });
   assert.equal(await response.text(), `network:${app.state.scope}src/app.js`);
+  app.state.offline = true;
+  const recovered = await app.request('./src/app.js', { mode: 'cors' });
+  assert.equal(await recovered.text(), `network:${app.state.scope}src/app.js`);
+  assert.equal(app.state.fetched.length, 1);
+});
+
+test('navigation recovery writes the canonical page for offline query and index URLs', async () => {
+  const app = worker();
+  const response = await app.request('./?source=recovery');
+  assert.equal(response.status, 200);
+  app.state.offline = true;
+  for (const page of ['./', './index.html', './?source=later']) {
+    assert.equal(await (await app.request(page)).text(), `network:${app.state.scope}?source=recovery`);
+  }
+  assert.equal(app.state.fetched.length, 1);
+});
+
+test('recovery never caches server errors, partial responses, or redirects', async () => {
+  for (const scenario of [
+    { networkStatus: 404 }, { networkStatus: 503 }, { networkStatus: 206 },
+    { networkRedirect: true }, { networkURL: 'https://other.example/app.js' },
+  ]) {
+    const app = worker();
+    Object.assign(app.state, scenario);
+    await app.request('./src/app.js', { mode: 'cors' });
+    assert.equal(app.cachesByName.get(app.state.opened[0]).size, 0);
+    app.state.offline = true;
+    assert.equal((await app.request('./src/app.js', { mode: 'cors' })).status, 503);
+  }
+});
+
+test('a cache-write quota failure still returns the successful network response', async () => {
+  const app = worker();
+  app.state.writeDenied = true;
+  const response = await app.request('./');
+  assert.equal(response.status, 200);
+  assert.equal(await response.text(), `network:${app.state.scope}`);
 });
 
 test('offline cache misses return useful navigation and asset failures', async () => {
@@ -190,8 +245,18 @@ test('unavailable CacheStorage preserves online play and does not block activati
 
 test('an incomplete release fails installation without forcing the old worker out', async () => {
   const app = worker();
-  app.state.downloadFailed = true;
+  await app.lifecycle('install');
+  const currentCache = app.cachesByName.get(app.state.opened[0]);
+  currentCache.set(`${app.state.scope}index.html`, 'previous working page');
+  const before = [...currentCache.entries()];
+  const oldName = `sudoku:${encodeURIComponent(app.state.scope)}:previous-release`;
+  app.cachesByName.set(oldName, new Map([['saved', 'previous working release']]));
+  app.state.precached = [];
+  app.state.failDownloadAt = `${app.state.scope}src/game.js`;
   await assert.rejects(app.lifecycle('install'), /could not be downloaded/);
+  assert.ok(app.state.precached.length > 1, 'failure occurs after some downloads finish');
+  assert.deepEqual([...currentCache.entries()], before, 'no downloaded subset replaces the working cache');
+  assert.equal(app.cachesByName.get(oldName).get('saved'), 'previous working release');
   assert.equal(app.state.skipped, 0);
   assert.equal(app.state.deleted.length, 0);
 });

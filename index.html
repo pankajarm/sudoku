@@ -24,12 +24,12 @@
         <nav class="main-nav" aria-label="Main navigation">
           <button id="nav-classic" class="nav-link active" type="button" aria-current="page">Play</button>
           <button id="nav-daily" class="nav-link" type="button">Daily<span class="nav-dot" aria-hidden="true"></span></button>
-          <button id="nav-stats" class="nav-link" type="button">Statistics</button>
-          <button id="nav-help" class="nav-link" type="button">How to play</button>
+          <button id="nav-stats" aria-haspopup="dialog" aria-controls="modal" class="nav-link" type="button">Statistics</button>
+          <button id="nav-help" aria-haspopup="dialog" aria-controls="modal" class="nav-link" type="button">How to play</button>
         </nav>
         <div class="header-actions">
           <button id="theme-btn" class="icon-btn" type="button" aria-label="Switch color theme" title="Switch color theme"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.6 13.4A8.7 8.7 0 0 1 10.6 3.3 8.8 8.8 0 1 0 20.6 13.4Z"/></svg></button>
-          <button id="settings-btn" class="icon-btn" type="button" aria-label="Game settings" title="Game settings"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.7 3h4.6l.6 2.3 2 1.2 2.3-.6 2.3 4-1.7 1.7v2.3l1.7 1.7-2.3 4-2.3-.6-2 1.2-.6 2.3H9.7l-.6-2.3-2-1.2-2.3.6-2.3-4 1.7-1.7v-2.3L2.5 9.9l2.3-4 2.3.6 2-1.2L9.7 3Z" transform="translate(0 -1) scale(1 .98)"/><circle cx="12" cy="11.7" r="3.2"/></svg></button>
+          <button id="settings-btn" aria-haspopup="dialog" aria-controls="modal" class="icon-btn" type="button" aria-label="Game settings" title="Game settings"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.7 3h4.6l.6 2.3 2 1.2 2.3-.6 2.3 4-1.7 1.7v2.3l1.7 1.7-2.3 4-2.3-.6-2 1.2-.6 2.3H9.7l-.6-2.3-2-1.2-2.3.6-2.3-4 1.7-1.7v-2.3L2.5 9.9l2.3-4 2.3.6 2-1.2L9.7 3Z" transform="translate(0 -1) scale(1 .98)"/><circle cx="12" cy="11.7" r="3.2"/></svg></button>
         </div>
       </header>
 
@@ -39,7 +39,7 @@
             <p class="eyebrow"><span class="eyebrow-line" aria-hidden="true"></span><span id="mode-label">A LITTLE DAILY FOCUS</span></p>
             <h1 id="game-title">Classic Sudoku</h1>
           </div>
-          <button id="share-btn" class="share-btn" type="button"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V3m-4 4 4-4 4 4M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg><span>Share puzzle</span></button>
+          <button id="share-btn" aria-haspopup="dialog" aria-controls="modal" class="share-btn" type="button"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V3m-4 4 4-4 4 4M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg><span>Share puzzle</span></button>
         </div>
 
         <div class="game-layout">
@@ -48,12 +48,12 @@
               <label class="difficulty-control" for="difficulty"><span class="meta-label">Difficulty</span><span class="select-wrap"><select id="difficulty" aria-label="Puzzle difficulty"><option value="easy">Easy</option><option value="medium" selected>Medium</option><option value="hard">Hard</option><option value="expert">Expert</option></select><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg></span></label>
               <div class="game-counters">
                 <div class="mistake-counter"><span class="meta-label">Mistakes</span><strong id="mistakes-count">0</strong></div>
-                <div class="timer-control"><svg class="timer-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2M9 2h6M12 2v3"/></svg><span id="timer" aria-label="Elapsed time">00:00</span><button id="pause-btn" class="pause-btn" type="button" aria-label="Pause game" title="Pause game"><svg width="15" height="15" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><rect x="5" y="4" width="3" height="12" rx="1"/><rect x="12" y="4" width="3" height="12" rx="1"/></svg></button></div>
+                <div class="timer-control"><svg class="timer-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2M9 2h6M12 2v3"/></svg><span id="timer" role="timer" aria-live="off" aria-label="Elapsed time">00:00</span><button id="pause-btn" class="pause-btn" type="button" aria-keyshortcuts="P" aria-label="Pause game" title="Pause game"><svg width="15" height="15" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><rect x="5" y="4" width="3" height="12" rx="1"/><rect x="12" y="4" width="3" height="12" rx="1"/></svg></button></div>
               </div>
             </div>
 
             <div id="board-wrap" class="board-wrap">
-              <div id="board" class="sudoku-board" role="grid" aria-label="Sudoku puzzle" aria-rowcount="9" aria-colcount="9"></div>
+              <div id="board" class="sudoku-board" role="grid" tabindex="-1" aria-label="Sudoku puzzle" aria-rowcount="9" aria-colcount="9"></div>
               <div id="pause-overlay" class="pause-overlay" hidden><div class="pause-symbol" aria-hidden="true"><svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1.5"/><rect x="14" y="4" width="4" height="16" rx="1.5"/></svg></div><h2>A moment to pause.</h2><p>Your puzzle will be right here.</p><button id="resume-btn" class="primary-btn" type="button">Back to the puzzle<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14m-5-5 5 5-5 5"/></svg></button></div>
             </div>
 
@@ -69,14 +69,14 @@
                 <button id="undo-btn" class="tool-btn" type="button" title="Undo (Ctrl or Command + Z)"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 5-5 5 5 5M4 10h10a6 6 0 0 1 0 12" transform="translate(0 -2)"/></svg><span>Undo</span></button>
                 <button id="redo-btn" class="tool-btn" type="button" title="Redo (Ctrl or Command + Shift + Z)"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 5 5 5-5 5m5-5H10a6 6 0 0 0 0 12" transform="translate(0 -2)"/></svg><span>Redo</span></button>
                 <button id="erase-btn" class="tool-btn" type="button" title="Erase (Backspace or Delete)"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m14 3 7 7a1.4 1.4 0 0 1 0 2l-8 8H7l-4-4a1.4 1.4 0 0 1 0-2L14 3ZM7 10l9 9M13 20h8"/></svg><span>Erase</span></button>
-                <button id="notes-btn" class="tool-btn notes-btn" type="button" aria-pressed="false" title="Toggle pencil notes (N)"><span class="notes-icon"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 4 5 5M4 15 16 3a2 2 0 0 1 3 0l2 2a2 2 0 0 1 0 3L9 20l-6 1 1-6Z"/></svg><small id="notes-state">OFF</small></span><span>Notes</span></button>
+                <button id="notes-btn" class="tool-btn notes-btn" type="button" aria-keyshortcuts="N" aria-pressed="false" title="Toggle pencil notes (N)"><span class="notes-icon"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 4 5 5M4 15 16 3a2 2 0 0 1 3 0l2 2a2 2 0 0 1 0 3L9 20l-6 1 1-6Z"/></svg><small id="notes-state">OFF</small></span><span>Notes</span></button>
               </div>
               <div id="number-pad" class="number-pad" role="group" aria-label="Enter a number"></div>
               <div class="assistance-tools">
-                <button id="hint-btn" class="assistance-btn" type="button"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18h6m-5 3h4M8 14a6 6 0 1 1 8 0c-1 1-1 2-1 3H9c0-1 0-2-1-3Z"/></svg><span>Get a hint</span></button>
+                <button id="hint-btn" aria-haspopup="dialog" aria-controls="modal" class="assistance-btn" type="button" aria-keyshortcuts="H"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18h6m-5 3h4M8 14a6 6 0 1 1 8 0c-1 1-1 2-1 3H9c0-1 0-2-1-3Z"/></svg><span>Get a hint</span></button>
                 <button id="auto-notes-btn" class="assistance-btn" type="button"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 3 1.3 3.7L20 8l-3.7 1.3L15 13l-1.3-3.7L10 8l3.7-1.3L15 3ZM5 14l.9 2.1L8 17l-2.1.9L5 20l-.9-2.1L2 17l2.1-.9L5 14ZM20 15v6m-3-3h6"/></svg><span>Auto notes</span></button>
               </div>
-              <button id="new-game-btn" class="primary-btn new-game-btn" type="button"><span>New game</span><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14m-5-5 5 5-5 5"/></svg></button>
+              <button id="new-game-btn" aria-haspopup="dialog" aria-controls="modal" class="primary-btn new-game-btn" type="button"><span>New game</span><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14m-5-5 5 5-5 5"/></svg></button>
             </div>
 
             <section class="daily-card" aria-labelledby="daily-heading">

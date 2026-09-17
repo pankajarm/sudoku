@@ -161,3 +161,46 @@ test('hints correct mistakes, teach valid moves, and disclose a reveal when logi
   assert.equal(reveal.reveal, true);
   assert.match(reveal.explanation, /solution reveal/);
 });
+
+test('hints solve seeded partial games at every difficulty without changing existing correct values', () => {
+  const random = seededRandom('partial-game-hints-v1');
+  for (const level of LEVELS) {
+    for (let n = 0; n < 8; n++) {
+      const { puzzle, solution } = makePuzzle(PUZZLES, level, `partial-hints-${level}-${n}`);
+      const values = puzzle.map((value, i) => value || (random() < 0.35 ? solution[i] : 0));
+      const starting = [...values];
+      let hints = 0;
+      while (values.includes(0)) {
+        const before = [...values], hint = getHint(values, solution);
+        assert.deepEqual(values, before, 'a hint preview must not change the board');
+        assert.equal(hint.type, 'place');
+        assert.equal(values[hint.index], 0);
+        assert.equal(hint.value, solution[hint.index]);
+        if (hint.reveal) assert.match(hint.explanation, /solution reveal/);
+        values[hint.index] = hint.value;
+        assert.ok(++hints <= 81, 'hinted play must make progress');
+        assert.equal(isConsistent(values), true);
+        assert.ok(starting.every((value, i) => !value || values[i] === value));
+      }
+      assert.deepEqual(values, solution);
+      assert.equal(getHint(values, solution), null);
+    }
+  }
+});
+
+test('a year of seeded daily challenges has stable unique puzzles with matching difficulty', () => {
+  const start = Date.parse('2024-01-01T00:00:00Z');
+  const seen = new Set();
+  for (let day = 0; day < 366; day++) {
+    const date = dateKey(new Date(start + day * 86400000)), level = dailyLevel(date);
+    const first = makePuzzle(PUZZLES, level, `daily:${date}:v1`);
+    const second = makePuzzle(PUZZLES, level, `daily:${date}:v1`);
+    assert.deepEqual(first, second);
+    assert.equal(ratePuzzle(first.puzzle), level);
+    const solved = search(first.puzzle, 2, null, 50000);
+    assert.equal(solved.count, 1);
+    assert.deepEqual(solved.solution, first.solution);
+    assert.ok(!seen.has(first.puzzle.join('')), `repeated daily board on ${date}`);
+    seen.add(first.puzzle.join(''));
+  }
+});

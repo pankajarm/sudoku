@@ -1,20 +1,15 @@
 import { PUZZLES } from './puzzles.js';
 import { LEVELS, PEERS, rowOf, colOf, digits, cellName, dateKey, dailyLevel, makePuzzle, getHint } from './engine.js';
 import { createGame, enterDigit, eraseCell, fillNotes, undo, redo, validateGame, validateSettings,
-  validateStats, recordWin, streaks, parseShared } from './game.js';
+  validateStats, recordWin, streaks, parseShared, moveSelection } from './game.js';
+import { createStore, mergeStats } from './storage.js';
+import { createClock } from './clock.js';
 
 const $ = (id) => document.getElementById(id);
 const cap = (s) => s[0].toUpperCase() + s.slice(1);
-const storagePrefix = 'sudoku:v1:';
-let storageOK = true, recoveredSave = false;
-function read(key) {
-  try { const raw = localStorage.getItem(storagePrefix + key); return raw ? JSON.parse(raw) : null; }
-  catch { recoveredSave = true; return null; }
-}
-function write(key, value) {
-  try { localStorage.setItem(storagePrefix + key, JSON.stringify(value)); }
-  catch { storageOK = false; }
-}
+const store = createStore({ getItem: (key) => localStorage.getItem(key), setItem: (key, value) => localStorage.setItem(key, value) });
+const read = (key) => store.load(key);
+let recoveredSave = false;
 function restored(mode) {
   const raw = read(mode);
   const valid = validateGame(raw);
@@ -24,8 +19,8 @@ function restored(mode) {
 const settings = validateSettings(read('settings'));
 const stats = validateStats(read('stats'));
 const saved = { classic: restored('classic'), daily: restored('daily') };
-let game, paused = false, hintCell = -1, lastTick = performance.now(), toastTimer, intervalCount = 0;
-let visibilityActive = !document.hidden;
+let game, paused = false, hintCell = -1, toastTimer, intervalCount = 0;
+const playClock = createClock();
 let observedDate = dateKey();
 const modal = $('modal');
 const cellElements = [], numberElements = [];
@@ -58,15 +53,74 @@ function getDaily() {
   return createGame(makePuzzle(PUZZLES, dailyLevel(date), `daily:${date}:v1`), 'daily', date);
 }
 function checkpoint() {
-  const now = performance.now();
-  if (game && !game.completed && !paused && !modal.open && visibilityActive) game.elapsed += now - lastTick;
-  lastTick = now;
+  if (game) game.elapsed += playClock.update(!game.completed && !paused && !modal.open && !document.hidden);
 }
 function save() {
   if (!game) return;
   saved[game.mode] = game;
-  write(game.mode, game); write('active', game.mode); write('settings', settings);
-  $('save-status').textContent = storageOK ? 'Progress saved on this device' : 'Storage unavailable · keep this tab open';
+  const result = store.save(game.mode, game);
+  if (result === 'conflict') {
+    syncExternal();
+    toast('A newer save from another tab was loaded. Your saved progress is safe.');
+  }
+  $('save-status').textContent = store.available ? 'Progress saved on this device' : 'Storage unavailable · keep this tab open';
+  return result;
+}
+function saveActiveMode() { read('active'); store.save('active', game.mode); }
+function saveStats() {
+  const merge = () => {
+    Object.assign(stats, mergeStats(stats, read('stats')));
+    if (store.save('stats', stats) === 'conflict') {
+      Object.assign(stats, mergeStats(stats, read('stats')));
+      store.save('stats', stats);
+    }
+  };
+  if (navigator.locks?.request) navigator.locks.request('sudoku:statistics', merge).catch(merge);
+  else merge();
+}
+function gameContent(state) {
+  return JSON.stringify([state.initial, state.values, state.notes, state.history, state.future, state.hints, state.mistakes, state.completed]);
+}
+function syncExternal() {
+  if (!game) return false;
+  let refresh = false, replaced = false;
+  checkpoint();
+  for (const mode of ['classic', 'daily']) {
+    if (!store.hasChanged(mode)) continue;
+    const next = validateGame(read(mode));
+    if (!next || next.mode !== mode) continue;
+    saved[mode] = next;
+    if (game.mode !== mode) continue;
+    const samePuzzle = next.initial.join('') === game.initial.join('') && next.date === game.date;
+    replaced = gameContent(next) !== gameContent(game);
+    if (next.completed || !samePuzzle) paused = false;
+    if (samePuzzle) {
+      if (!next.completed) next.elapsed = Math.max(next.elapsed, game.elapsed);
+      next.selected = game.selected;
+      next.noteMode = game.noteMode;
+    }
+    game = next; playClock.reset(); refresh = true;
+  }
+  if (store.hasChanged('settings')) { Object.assign(settings, validateSettings(read('settings'))); refresh = true; }
+  if (store.hasChanged('stats')) { Object.assign(stats, mergeStats(stats, read('stats'))); refresh = true; }
+  if (replaced) {
+    hintCell = -1;
+    if (modal.open) closeDialog();
+    toast('Your puzzle was updated in another tab. The latest progress is here.');
+  }
+  if (refresh) render();
+  return replaced;
+}
+function updateSetting(key, value) {
+  // Apply only this preference to the latest saved settings from other tabs.
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const latest = read('settings');
+    if (latest) Object.assign(settings, validateSettings(latest));
+    settings[key] = value;
+    if (store.save('settings', settings) !== 'conflict') break;
+    if (attempt === 2) Object.assign(settings, validateSettings(read('settings')));
+  }
+  render();
 }
 function toast(message) {
   clearTimeout(toastTimer);
@@ -74,7 +128,7 @@ function toast(message) {
   toastTimer = setTimeout(() => { $('toast').hidden = true; }, 4200);
 }
 function clearHash() { if (location.hash) history.replaceState(null, '', location.pathname + location.search); }
-function isActive() { return game && !paused && !game.completed && !modal.open && !document.hidden; }
+function isActive() { return !syncExternal() && game && !paused && !game.completed && !modal.open && !document.hidden; }
 function focusCell() { if (!paused) cellElements[game.selected]?.focus({ preventScroll: true }); }
 
 function buildBoard() {
@@ -85,11 +139,11 @@ function buildBoard() {
       cell.type = 'button'; cell.setAttribute('role', 'gridcell'); cell.dataset.index = index;
       cell.setAttribute('aria-rowindex', r + 1); cell.setAttribute('aria-colindex', c + 1);
       cell.addEventListener('click', () => {
-        if (paused) return;
+        if (syncExternal() || paused) return;
         game.selected = index; hintCell = -1; render(); save();
       });
       cell.addEventListener('focus', () => {
-        if (paused || game.selected === index) return;
+        if (syncExternal() || paused || game.selected === index) return;
         game.selected = index; hintCell = -1; render(); save();
       });
       row.append(cell); cellElements.push(cell);
@@ -147,11 +201,13 @@ function renderDaily() {
 }
 
 function render() {
+  checkpoint();
+  for (const input of modal.querySelectorAll('input[data-setting]')) input.checked = settings[input.dataset.setting];
   document.body.dataset.theme = settings.theme;
   document.documentElement.style.colorScheme = settings.theme;
   $('theme-btn').setAttribute('aria-label', settings.theme === 'light' ? 'Switch to dark theme' : 'Switch to light theme');
   $('theme-btn').title = settings.theme === 'light' ? 'Switch to dark theme' : 'Switch to light theme';
-  $('mode-label').textContent = game.mode === 'daily' ? 'THE DAILY CHALLENGE' : 'A LITTLE EVERYDAY CLARITY';
+  $('mode-label').textContent = game.mode === 'daily' ? `DAILY CHALLENGE · ${game.date}` : 'A LITTLE EVERYDAY CLARITY';
   $('game-title').textContent = game.mode === 'daily' ? 'One day. One puzzle.' : 'Find your focus.';
   $('difficulty').value = game.level;
   $('difficulty').disabled = game.mode === 'daily';
@@ -196,8 +252,9 @@ function changed(message) {
   hintCell = -1;
   if (message !== undefined) $('game-status').textContent = message;
   if (game.completed) {
-    if (recordWin(stats, game, dateKey())) write('stats', stats);
-    render(); save(); showCompletion();
+    if (recordWin(stats, game, dateKey())) saveStats();
+    render();
+    if (save() !== 'conflict' && game.completed) showCompletion();
   } else { render(); save(); }
 }
 function input(n, pencil) {
@@ -217,6 +274,7 @@ function toggleNotes() {
   $('game-status').textContent = game.noteMode ? 'Notes on. Add possible numbers to an empty cell.' : 'Notes off. Enter your answer.';
 }
 function togglePause() {
+  syncExternal();
   if (game.completed || modal.open) return;
   checkpoint(); paused = !paused; render(); save();
   if (paused) $('resume-btn').focus(); else focusCell();
@@ -228,9 +286,14 @@ function openDialog(title, contents, actions = []) {
   $('modal-body').replaceChildren(...contents);
   $('modal-actions').replaceChildren(...actions);
   if (!modal.open) modal.showModal();
+  else { $('modal-title').tabIndex = -1; $('modal-title').focus(); }
+  checkpoint();
 }
-function closeDialog() { modal.close(); lastTick = performance.now(); }
-modal.addEventListener('close', () => { lastTick = performance.now(); hintCell = -1; renderBoard(); });
+function closeDialog() { modal.close(); checkpoint(); }
+modal.addEventListener('close', () => {
+  checkpoint(); hintCell = -1; renderBoard();
+  if (document.activeElement === document.body || !document.activeElement?.isConnected) focusCell();
+});
 $('close-modal-btn').addEventListener('click', closeDialog);
 modal.addEventListener('click', (event) => {
   if (event.target !== modal) return;
@@ -239,17 +302,23 @@ modal.addEventListener('click', (event) => {
 });
 
 function setGame(next) {
-  checkpoint(); save(); game = next; saved[game.mode] = game;
-  paused = false; hintCell = -1; lastTick = performance.now();
+  checkpoint();
+  if (save() === 'conflict') return false;
+  game = next; saved[game.mode] = game;
+  paused = false; hintCell = -1; playClock.reset();
   if (modal.open) closeDialog();
   clearHash(); $('game-status').textContent = 'Select a cell, then choose a number.';
-  if (game.completed && recordWin(stats, game, dateKey())) write('stats', stats);
-  render(); save();
+  if (game.completed && recordWin(stats, game, dateKey())) saveStats();
+  render();
+  if (save() === 'conflict') return false;
+  saveActiveMode();
+  return true;
 }
-function startClassic(level) { setGame(freshClassic(level)); toast(`${cap(level)} puzzle ready. Take your time.`); }
+function startClassic(level) { if (setGame(freshClassic(level))) toast(`${cap(level)} puzzle ready. Take your time.`); }
 function confirmClassic(level) {
+  if (syncExternal()) return;
   const classic = game.mode === 'classic' ? game : saved.classic;
-  if (!classic || classic.completed || !classic.history.length) { startClassic(level); return; }
+  if (!classic || classic.completed || !(classic.history.length || classic.future.length)) { startClassic(level); return; }
   openDialog('Start a new puzzle?', [paragraph(`Your unfinished classic puzzle will be replaced with a new ${level} puzzle. Your daily challenge is saved separately.`)],
     [button('Keep playing', 'secondary-btn', closeDialog), button('Start new puzzle', 'primary-btn', () => startClassic(level))]);
 }
@@ -266,18 +335,25 @@ function chooseDifficulty() {
 function confirmRestart() {
   openDialog('Start this puzzle again?', [paragraph('This clears your entries, notes, and timer. Any recorded completion stays in your statistics.')],
     [button('Keep playing', 'secondary-btn', closeDialog), button('Restart puzzle', 'primary-btn', () => {
-      setGame(createGame({ puzzle: game.initial, solution: game.solution, level: game.level }, game.mode, game.date));
-      toast('A clean grid. A fresh start.');
+      if (setGame(createGame({ puzzle: game.initial, solution: game.solution, level: game.level }, game.mode, game.date))) toast('A clean grid. A fresh start.');
     })]);
 }
 function switchDaily() {
+  syncExternal();
   if (game.mode === 'daily' && game.date === dateKey()) { toast(game.completed ? 'You’ve completed today’s challenge.' : 'You’re playing today’s challenge.'); return; }
-  setGame(getDaily());
-  toast(game.completed ? 'Today’s challenge is complete.' : 'Your classic puzzle is saved. Enjoy today’s challenge.');
+  const start = () => {
+    syncExternal();
+    if (setGame(getDaily())) toast(game.completed ? 'Today’s challenge is complete.' : 'Your classic puzzle is saved. Enjoy today’s challenge.');
+  };
+  if (saved.daily && saved.daily.date !== dateKey() && !saved.daily.completed && (saved.daily.history.length || saved.daily.future.length)) {
+    openDialog('Start today’s challenge?', [paragraph(`Your unfinished daily puzzle from ${saved.daily.date} will be replaced. You can keep working on it or begin today’s puzzle.`)],
+      [button('Keep my puzzle', 'secondary-btn', closeDialog), button('Play today’s puzzle', 'primary-btn', start)]);
+  } else start();
 }
 function switchClassic() {
+  syncExternal();
   if (game.mode === 'classic') return;
-  setGame(saved.classic || freshClassic()); toast('Your daily progress is saved.');
+  if (setGame(saved.classic || freshClassic())) toast('Your daily progress is saved.');
 }
 
 function showHint() {
@@ -285,12 +361,15 @@ function showHint() {
   const hint = getHint(game.values, game.solution);
   if (!hint) return;
   // Reading the explanation is already assistance, even without applying it.
-  game.hints++; save();
+  game.hints++;
+  if (save() === 'conflict') return;
+  const hintState = gameContent(game);
   hintCell = hint.index; game.selected = hint.index; render();
   const explanation = node('div', 'hint-explanation');
   for (const text of hint.explanation.split('\n\n')) explanation.append(paragraph(text));
   openDialog(hint.technique, [explanation, paragraph('This hint is included in your results, even if you place the number yourself.')],
     [button('I’ll try it', 'secondary-btn', closeDialog), button(hint.type === 'clear' ? 'Clear this cell' : hint.reveal ? 'Reveal this cell' : `Place ${hint.value}`, 'primary-btn', () => {
+      if (syncExternal() || gameContent(game) !== hintState) return;
       closeDialog(); checkpoint();
       const applied = hint.type === 'clear' ? eraseCell(game, hint.index) : enterDigit(game, hint.index, hint.value, settings, false);
       if (applied) changed('Hint applied. You’ve got the next move.');
@@ -309,6 +388,7 @@ function showCompletion() {
 }
 
 function showStats() {
+  syncExternal();
   const { current, best } = streaks(stats.dailyDates, dateKey());
   const grid = node('div', 'dialog-grid');
   for (const [value, label] of [[stats.wins.length, 'Puzzles solved'], [current, 'Daily streak'], [best, 'Best daily streak'], [stats.dailyDates.length, 'Daily challenges']]) {
@@ -342,8 +422,8 @@ function showSettings() {
   for (const [key, title, description] of choices) {
     const label = node('label', 'setting-row'), text = node('span');
     text.append(node('strong', '', title), node('small', '', description));
-    const input = node('input'); input.type = 'checkbox'; input.checked = settings[key]; input.setAttribute('aria-label', title);
-    input.addEventListener('change', () => { settings[key] = input.checked; render(); save(); });
+    const input = node('input'); input.type = 'checkbox'; input.checked = settings[key]; input.dataset.setting = key; input.setAttribute('aria-label', title);
+    input.addEventListener('change', () => updateSetting(key, input.checked));
     label.append(text, input); list.append(label);
   }
   openDialog('Make yourself comfortable.', [list, paragraph('Progress and preferences stay on this device. The game has no accounts, tracking, or ads.')],
@@ -376,8 +456,9 @@ function handleSharedPuzzle() {
   const imported = parseShared(location.hash);
   if (!imported) { toast('This puzzle link is invalid, ambiguous, or too complex to verify. Your game is safe.'); clearHash(); return; }
   if (game.initial.join('') === imported.puzzle.join('')) { clearHash(); return; }
-  const load = () => { setGame(createGame(imported)); toast('Shared puzzle loaded.'); };
-  if (game.mode === 'classic' && game.history.length && !game.completed || saved.classic?.history.length && !saved.classic.completed) {
+  const load = () => { if (setGame(createGame(imported))) toast('Shared puzzle loaded.'); };
+  if (game.mode === 'classic' && (game.history.length || game.future.length) && !game.completed ||
+    (saved.classic?.history.length || saved.classic?.future.length) && !saved.classic.completed) {
     openDialog('Open the shared puzzle?', [paragraph('This will replace your unfinished classic puzzle. Your daily progress stays saved.')],
       [button('Keep my puzzle', 'secondary-btn', () => { clearHash(); closeDialog(); }), button('Open puzzle', 'primary-btn', load)]);
   } else load();
@@ -402,7 +483,7 @@ $('nav-daily').addEventListener('click', switchDaily);
 $('nav-stats').addEventListener('click', showStats);
 $('nav-help').addEventListener('click', showHelp);
 $('settings-btn').addEventListener('click', showSettings);
-$('theme-btn').addEventListener('click', () => { settings.theme = settings.theme === 'light' ? 'dark' : 'light'; render(); save(); });
+$('theme-btn').addEventListener('click', () => { syncExternal(); updateSetting('theme', settings.theme === 'light' ? 'dark' : 'light'); });
 $('difficulty').addEventListener('change', (event) => { const level = event.target.value; event.target.value = game.level; confirmClassic(level); });
 
 document.addEventListener('keydown', (event) => {
@@ -422,36 +503,39 @@ document.addEventListener('keydown', (event) => {
   if (key === 'h') { event.preventDefault(); showHint(); return; }
   if (event.key.startsWith('Arrow')) {
     event.preventDefault();
-    const delta = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -9, ArrowDown: 9 }[event.key];
-    game.selected = Math.max(0, Math.min(80, game.selected + delta)); hintCell = -1;
+    game.selected = moveSelection(game.selected, event.key); hintCell = -1;
     render(); focusCell(); save();
   }
 });
 
 document.addEventListener('visibilitychange', () => {
-  checkpoint(); visibilityActive = !document.hidden; lastTick = performance.now(); save();
+  checkpoint(); syncExternal(); save();
 });
-window.addEventListener('pagehide', () => { checkpoint(); save(); });
+window.addEventListener('pagehide', () => { game.elapsed += playClock.update(false); save(); });
+window.addEventListener('pageshow', () => { playClock.reset(); syncExternal(); checkpoint(); });
+window.addEventListener('storage', (event) => { if (!event.key || event.key.startsWith('sudoku:v1:')) syncExternal(); });
 window.addEventListener('hashchange', handleSharedPuzzle);
 window.addEventListener('offline', () => toast('You’re offline. Keep playing; your progress stays here.'));
 window.addEventListener('online', () => toast('You’re back online.'));
 
 buildBoard();
-game = read('active') === 'daily' ? getDaily() : saved.classic || freshClassic();
+const unfinishedDaily = saved.daily && !saved.daily.completed && (saved.daily.history.length || saved.daily.future.length);
+game = read('active') === 'daily' ? unfinishedDaily ? saved.daily : getDaily() : saved.classic || freshClassic();
 saved[game.mode] = game;
-if (game.completed && recordWin(stats, game, dateKey())) write('stats', stats);
-render(); save(); handleSharedPuzzle();
-if (recoveredSave) toast('An unreadable save was skipped. Your game is ready to play.');
+if (game.completed && recordWin(stats, game, dateKey())) saveStats();
+render(); save(); saveActiveMode(); handleSharedPuzzle();
+if (recoveredSave || store.recovered) toast('An unreadable save was skipped. Your game is ready to play.');
 
 setInterval(() => {
   checkpoint();
   $('timer').textContent = settings.showTimer ? formatTime(game.elapsed) : '—';
-  if (++intervalCount % 10 === 0) save();
+  $('timer').setAttribute('aria-label', settings.showTimer ? `Elapsed time ${formatTime(game.elapsed)}` : 'Timer hidden');
+  if (++intervalCount % 10 === 0 && !document.hidden) { syncExternal(); save(); }
   if (observedDate !== dateKey()) { observedDate = dateKey(); renderDaily(); toast('A new daily challenge is ready. Your current puzzle is saved.'); }
 }, 500);
 
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('./sw.js', { scope: './' }).then((registration) => {
+  navigator.serviceWorker.register('./sw.js', { scope: './', updateViaCache: 'none' }).then((registration) => {
     registration.addEventListener('updatefound', () => {
       const worker = registration.installing;
       worker?.addEventListener('statechange', () => {

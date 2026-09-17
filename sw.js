@@ -1,11 +1,12 @@
 // Bump this version whenever a runtime asset changes in a release.
-const CACHE_VERSION = 'v2';
+const CACHE_VERSION = 'v3';
 const SCOPE = new URL(self.registration.scope);
 const CACHE_PREFIX = `sudoku:${encodeURIComponent(SCOPE.href)}:`;
 const CACHE_NAME = `${CACHE_PREFIX}${CACHE_VERSION}`;
 const ASSETS = [
   './', './index.html', './styles.css', './src/app.js', './src/engine.js',
-  './src/game.js', './src/puzzles.js', './favicon.svg', './manifest.webmanifest',
+  './src/game.js', './src/puzzles.js', './src/storage.js', './src/clock.js',
+  './favicon.svg', './manifest.webmanifest',
   './icons/icon-192.png', './icons/icon-512.png',
 ].map((path) => new URL(path, SCOPE).href);
 const ASSET_URLS = new Set(ASSETS);
@@ -16,7 +17,7 @@ self.addEventListener('install', (event) => {
   // No skipWaiting: an update must never replace an open game.
   event.waitUntil((async () => {
     const cache = await caches.open(CACHE_NAME);
-    await cache.addAll(ASSETS.map((url) => new Request(url, { cache: 'reload' })));
+    await cache.addAll(ASSETS.map((url) => new Request(url, { cache: 'reload', redirect: 'error' })));
   })());
 });
 
@@ -45,15 +46,23 @@ self.addEventListener('fetch', (event) => {
   event.respondWith((async () => {
     const cacheKey = request.mode === 'navigate' && (url.href === SCOPE.href || url.href === PAGE_URL)
       ? PAGE_URL : url.href;
+    let cache;
     try {
-      const cache = await caches.open(CACHE_NAME);
+      cache = await caches.open(CACHE_NAME);
       const cached = await cache.match(cacheKey);
       if (cached) return cached;
     } catch {
       // Browsers can deny or evict storage. Fall back to the network.
     }
     try {
-      return await fetch(request);
+      const response = await fetch(request);
+      // Restore evicted entries so a successful online visit repairs offline play.
+      // Never save redirects, partial/error responses, or another origin's data.
+      if (cache && response.status === 200 && !response.redirected &&
+          response.type !== 'opaque' && new URL(response.url || request.url).origin === SCOPE.origin) {
+        try { await cache.put(cacheKey, response.clone()); } catch { /* Storage can fill up while playing. */ }
+      }
+      return response;
     } catch {
       return new Response(request.mode === 'navigate'
         ? '<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Sudoku is offline</title><h1>Reconnect to load Sudoku</h1><p>This browser has not saved a complete offline copy yet. Connect to the internet and reload.</p></html>'
