@@ -4,8 +4,8 @@
   --page: #f6f8fb;
   --surface: #fff;
   --ink: #1c2b45;
-  --muted: #778296;
-  --faint: #929caf;
+  --muted: #56647a;
+  --faint: #647187;
   --line: #e3e8ef;
   --grid-line: #d3dbe5;
   --grid-strong: #54647b;
@@ -227,8 +227,8 @@ body[data-theme="dark"] {
   --page: #151d2b;
   --surface: #1d2839;
   --ink: #e2eaf5;
-  --muted: #98a6bc;
-  --faint: #7b8ba4;
+  --muted: #b1bfd4;
+  --faint: #98a6bc;
   --line: #2c3a50;
   --grid-line: #38485e;
   --grid-strong: #8a9bb4;

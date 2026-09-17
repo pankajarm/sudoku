@@ -1,5 +1,5 @@
 // Bump this version whenever a runtime asset changes in a release.
-const CACHE_VERSION = 'v1';
+const CACHE_VERSION = 'v2';
 const SCOPE = new URL(self.registration.scope);
 const CACHE_PREFIX = `sudoku:${encodeURIComponent(SCOPE.href)}:`;
 const CACHE_NAME = `${CACHE_PREFIX}${CACHE_VERSION}`;
