@@ -1,0 +1,13 @@
+{
+  "name": "sudoku",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "A quiet, self-contained Sudoku game for GitHub Pages.",
+  "scripts": {
+    "start": "node scripts/serve.mjs",
+    "test": "node --test tests/*.test.js",
+    "puzzles": "node scripts/generate-puzzles.mjs"
+  },
+  "engines": { "node": ">=22" }
+}

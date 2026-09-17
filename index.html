@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#f6f8fb">
+    <meta name="description" content="A little focus, one square at a time. Play a thoughtful, free Sudoku game with daily challenges, helpful hints, and offline play. No ads. No account.">
+    <meta name="color-scheme" content="light dark">
+    <title>Sudoku — A little focus, one square at a time</title>
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg">
+    <link rel="apple-touch-icon" href="./icons/icon-192.png">
+    <link rel="manifest" href="./manifest.webmanifest">
+    <link rel="stylesheet" href="./styles.css">
+    <script type="module" src="./src/app.js"></script>
+  </head>
+  <body data-theme="light">
+    <a class="skip-link" href="#board">Skip to puzzle</a>
+    <div id="app" class="app-shell">
+      <header class="site-header">
+        <a class="brand" href="./" aria-label="Sudoku home">
+          <svg class="brand-mark" width="30" height="30" viewBox="0 0 30 30" fill="none" aria-hidden="true"><rect x="2" y="2" width="26" height="26" rx="5" stroke="currentColor" stroke-width="2"/><path d="M11 2v26M20 2v26M2 11h26M2 20h26" stroke="currentColor" stroke-width="1.5"/><rect x="12" y="12" width="7" height="7" rx="1" fill="#f2a154"/></svg>
+          <span>sudoku<span class="brand-dot">.</span></span>
+        </a>
+        <nav class="main-nav" aria-label="Main navigation">
+          <button id="nav-classic" class="nav-link active" type="button" aria-current="page">Play</button>
+          <button id="nav-daily" class="nav-link" type="button">Daily<span class="nav-dot" aria-hidden="true"></span></button>
+          <button id="nav-stats" class="nav-link" type="button">Statistics</button>
+          <button id="nav-help" class="nav-link" type="button">How to play</button>
+        </nav>
+        <div class="header-actions">
+          <button id="theme-btn" class="icon-btn" type="button" aria-label="Switch color theme" title="Switch color theme"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.6 13.4A8.7 8.7 0 0 1 10.6 3.3 8.8 8.8 0 1 0 20.6 13.4Z"/></svg></button>
+          <button id="settings-btn" class="icon-btn" type="button" aria-label="Game settings" title="Game settings"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.7 3h4.6l.6 2.3 2 1.2 2.3-.6 2.3 4-1.7 1.7v2.3l1.7 1.7-2.3 4-2.3-.6-2 1.2-.6 2.3H9.7l-.6-2.3-2-1.2-2.3.6-2.3-4 1.7-1.7v-2.3L2.5 9.9l2.3-4 2.3.6 2-1.2L9.7 3Z" transform="translate(0 -1) scale(1 .98)"/><circle cx="12" cy="11.7" r="3.2"/></svg></button>
+        </div>
+      </header>
+
+      <main class="puzzle-desk">
+        <div class="desk-heading">
+          <div>
+            <p class="eyebrow"><span class="eyebrow-line" aria-hidden="true"></span><span id="mode-label">A LITTLE DAILY FOCUS</span></p>
+            <h1 id="game-title">Classic Sudoku</h1>
+          </div>
+          <button id="share-btn" class="share-btn" type="button"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V3m-4 4 4-4 4 4M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/></svg><span>Share puzzle</span></button>
+        </div>
+
+        <div class="game-layout">
+          <section class="board-section" aria-label="Sudoku game">
+            <div class="game-meta">
+              <label class="difficulty-control" for="difficulty"><span class="meta-label">Difficulty</span><span class="select-wrap"><select id="difficulty" aria-label="Puzzle difficulty"><option value="easy">Easy</option><option value="medium" selected>Medium</option><option value="hard">Hard</option><option value="expert">Expert</option></select><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg></span></label>
+              <div class="game-counters">
+                <div class="mistake-counter"><span class="meta-label">Mistakes</span><strong id="mistakes-count">0</strong></div>
+                <div class="timer-control"><svg class="timer-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2M9 2h6M12 2v3"/></svg><span id="timer" aria-label="Elapsed time">00:00</span><button id="pause-btn" class="pause-btn" type="button" aria-label="Pause game" title="Pause game"><svg width="15" height="15" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><rect x="5" y="4" width="3" height="12" rx="1"/><rect x="12" y="4" width="3" height="12" rx="1"/></svg></button></div>
+              </div>
+            </div>
+
+            <div id="board-wrap" class="board-wrap">
+              <div id="board" class="sudoku-board" role="grid" aria-label="Sudoku puzzle" aria-rowcount="9" aria-colcount="9"></div>
+              <div id="pause-overlay" class="pause-overlay" hidden><div class="pause-symbol" aria-hidden="true"><svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1.5"/><rect x="14" y="4" width="4" height="16" rx="1.5"/></svg></div><h2>A moment to pause.</h2><p>Your puzzle will be right here.</p><button id="resume-btn" class="primary-btn" type="button">Back to the puzzle<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14m-5-5 5 5-5 5"/></svg></button></div>
+            </div>
+
+            <div class="board-caption"><span id="progress-label">A fresh puzzle. A fresh perspective.</span><span class="save-indicator"><span class="save-dot" aria-hidden="true"></span><span id="save-status">Saved on this device</span></span></div>
+            <div class="progress-track" aria-hidden="true"><div id="progress-fill" class="progress-fill"></div></div>
+            <p id="game-status" class="game-status" role="status" aria-live="polite">Select a square to get started.</p>
+          </section>
+
+          <aside class="control-panel" aria-label="Game controls">
+            <div class="move-panel">
+              <div class="panel-heading"><h2>Make your move</h2><span class="keyboard-hint" title="You can also use your keyboard"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="3"/><path d="M6 9h.01M10 9h.01M14 9h.01M18 9h.01M6 12h.01M10 12h.01M14 12h.01M18 12h.01M7 15h10"/></svg></span></div>
+              <div class="edit-tools" role="group" aria-label="Editing tools">
+                <button id="undo-btn" class="tool-btn" type="button" title="Undo (Ctrl or Command + Z)"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 5-5 5 5 5M4 10h10a6 6 0 0 1 0 12" transform="translate(0 -2)"/></svg><span>Undo</span></button>
+                <button id="redo-btn" class="tool-btn" type="button" title="Redo (Ctrl or Command + Shift + Z)"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 5 5 5-5 5m5-5H10a6 6 0 0 0 0 12" transform="translate(0 -2)"/></svg><span>Redo</span></button>
+                <button id="erase-btn" class="tool-btn" type="button" title="Erase (Backspace or Delete)"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m14 3 7 7a1.4 1.4 0 0 1 0 2l-8 8H7l-4-4a1.4 1.4 0 0 1 0-2L14 3ZM7 10l9 9M13 20h8"/></svg><span>Erase</span></button>
+                <button id="notes-btn" class="tool-btn notes-btn" type="button" aria-pressed="false" title="Toggle pencil notes (N)"><span class="notes-icon"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 4 5 5M4 15 16 3a2 2 0 0 1 3 0l2 2a2 2 0 0 1 0 3L9 20l-6 1 1-6Z"/></svg><small id="notes-state">OFF</small></span><span>Notes</span></button>
+              </div>
+              <div id="number-pad" class="number-pad" role="group" aria-label="Enter a number"></div>
+              <div class="assistance-tools">
+                <button id="hint-btn" class="assistance-btn" type="button"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18h6m-5 3h4M8 14a6 6 0 1 1 8 0c-1 1-1 2-1 3H9c0-1 0-2-1-3Z"/></svg><span>Get a hint</span></button>
+                <button id="auto-notes-btn" class="assistance-btn" type="button"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 3 1.3 3.7L20 8l-3.7 1.3L15 13l-1.3-3.7L10 8l3.7-1.3L15 3ZM5 14l.9 2.1L8 17l-2.1.9L5 20l-.9-2.1L2 17l2.1-.9L5 14ZM20 15v6m-3-3h6"/></svg><span>Auto notes</span></button>
+              </div>
+              <button id="new-game-btn" class="primary-btn new-game-btn" type="button"><span>New game</span><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14m-5-5 5 5-5 5"/></svg></button>
+            </div>
+
+            <section class="daily-card" aria-labelledby="daily-heading">
+              <div class="daily-card-top"><span class="calendar-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M7 3v4M17 3v4M3 11h18M8 15h1m3 0h1m3 0h1m-9 3h1m3 0h1"/></svg></span><span class="daily-date" id="daily-date">TODAY'S CHALLENGE</span><span class="daily-level" id="daily-level">Medium</span></div>
+              <h2 id="daily-heading">A fresh challenge, every day.</h2>
+              <p id="daily-status" class="daily-status">Make a little room for a good puzzle.</p>
+              <div class="daily-card-bottom"><button id="daily-btn" class="daily-link" type="button">Play today's puzzle<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14m-5-5 5 5-5 5"/></svg></button><span class="streak-badge" title="Consecutive daily challenges completed"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 3c1 5-5 5-3 10 1-1 2-2 2-4 4 3 7 5 7 8a7 7 0 0 1-14 0c0-4 3-5 3-8 0 0 1 2 1 3 1-4 4-5 4-9Z"/></svg><span id="daily-streak">0</span></span></div>
+            </section>
+          </aside>
+        </div>
+        <div class="desk-footnote"><span class="footnote-flower" aria-hidden="true">✳</span><p>No rush. No distractions. Just you and the next number.</p></div>
+      </main>
+
+      <footer class="site-footer"><span>Made for a little focus.</span><div><span class="privacy-note"><span aria-hidden="true">✓</span> Private by design</span><a href="https://github.com/pankajarm/sudoku" target="_blank" rel="noopener noreferrer">View on GitHub<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12 12 4M5 4h7v7"/></svg></a></div></footer>
+    </div>
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+    <dialog id="modal" class="modal" aria-labelledby="modal-title"><div class="modal-header"><h2 id="modal-title"></h2><button id="close-modal-btn" class="icon-btn" type="button" aria-label="Close dialog"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button></div><div id="modal-body" class="modal-body"></div><div id="modal-actions" class="modal-actions"></div></dialog>
+    <noscript><div class="noscript-note">This Sudoku game needs JavaScript to run. Enable JavaScript in your browser to play.</div></noscript>
+  </body>
+</html>
